@@ -7,6 +7,9 @@ dependencies = [
     "fastapi[standard]>=0.115",
     "pydantic-settings>=2.0",
     "httpx>=0.28",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]

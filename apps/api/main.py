@@ -1,7 +1,18 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
+from apps.api.config import settings
+from apps.api.db.session import init_db
 from apps.api.routers import health
 
-app = FastAPI(title="Lyra API", version="1.0.0")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.database_url:
+        init_db(settings.database_url)
+    yield
+
+
+app = FastAPI(title="Lyra API", version="1.0.0", lifespan=lifespan)
 app.include_router(health.router)
