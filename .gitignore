@@ -1,0 +1,23 @@
+# Ambiente Python
+.env
+.env.local
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Ferramentas de análise
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Claude Code
+.claude/
+
+# Frontend / Node
+node_modules/
+.next/
+dist/
+build/
