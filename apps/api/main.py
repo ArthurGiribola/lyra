@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from apps.api.config import settings
 from apps.api.db.session import init_db
-from apps.api.routers import health, tracks
+from apps.api.routers import health, lyrics, tracks
 from apps.api.services.lyrics import init_providers
 
 
@@ -22,3 +22,4 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Lyra API", version="1.0.0", lifespan=lifespan)
 app.include_router(health.router)
 app.include_router(tracks.router)
+app.include_router(lyrics.router)
