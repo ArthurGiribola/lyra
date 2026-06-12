@@ -1,10 +1,12 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi import HTTPException
-from unittest.mock import patch
 
 import apps.api.services.lyrics as lyrics_module
 from apps.api.providers.base import LyricsProvider
 from apps.api.providers.dummy import DummyLyricsProvider
+from apps.api.providers.lrclib import LRCLibProvider
 from apps.api.schemas.lyrics import LyricsResult
 from apps.api.services.lyrics import get_lyrics
 
@@ -12,6 +14,18 @@ from apps.api.services.lyrics import get_lyrics
 class _NullProvider(LyricsProvider):
     async def get_lyrics(self, title: str, artist: str) -> None:
         return None
+
+
+def _mock_client(status: int, plain_lyrics: str | None = None) -> AsyncMock:
+    resp = MagicMock()
+    resp.status_code = status
+    resp.json.return_value = {"plainLyrics": plain_lyrics}
+    client = AsyncMock()
+    client.get.return_value = resp
+    return client
+
+
+# --- DummyLyricsProvider ---
 
 
 async def test_dummy_provider_returns_lyrics_result() -> None:
@@ -29,9 +43,51 @@ async def test_dummy_provider_text_contains_title_and_artist() -> None:
     assert "The Weeknd" in result.text
 
 
-async def test_get_lyrics_returns_result_from_provider() -> None:
-    result = await get_lyrics(title="Blinding Lights", artist="The Weeknd")
+# --- LRCLibProvider ---
+
+
+async def test_lrclib_provider_returns_lyrics_on_success() -> None:
+    provider = LRCLibProvider(_mock_client(200, "Verse 1\nChorus"))
+    result = await provider.get_lyrics(title="Blinding Lights", artist="The Weeknd")
     assert isinstance(result, LyricsResult)
+    assert result.provider == "lrclib"
+    assert result.text == "Verse 1\nChorus"
+
+
+async def test_lrclib_provider_returns_none_when_not_found() -> None:
+    provider = LRCLibProvider(_mock_client(404))
+    result = await provider.get_lyrics(title="Unknown Track", artist="Nobody")
+    assert result is None
+
+
+async def test_lrclib_provider_returns_none_on_provider_error() -> None:
+    provider = LRCLibProvider(_mock_client(500))
+    result = await provider.get_lyrics(title="Blinding Lights", artist="The Weeknd")
+    assert result is None
+
+
+# --- get_lyrics orchestration ---
+
+
+async def test_get_lyrics_returns_result_from_first_provider() -> None:
+    with patch.object(
+        lyrics_module,
+        "_PROVIDERS",
+        [LRCLibProvider(_mock_client(200, "Real lyrics")), DummyLyricsProvider()],
+    ):
+        result = await get_lyrics(title="Blinding Lights", artist="The Weeknd")
+    assert isinstance(result, LyricsResult)
+    assert result.provider == "lrclib"
+    assert result.text == "Real lyrics"
+
+
+async def test_get_lyrics_falls_back_to_dummy_when_lrclib_returns_none() -> None:
+    with patch.object(
+        lyrics_module,
+        "_PROVIDERS",
+        [LRCLibProvider(_mock_client(404)), DummyLyricsProvider()],
+    ):
+        result = await get_lyrics(title="Blinding Lights", artist="The Weeknd")
     assert result.provider == "dummy"
 
 

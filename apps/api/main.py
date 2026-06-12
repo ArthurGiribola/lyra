@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from apps.api.config import settings
 from apps.api.db.session import init_db
 from apps.api.routers import health, tracks
+from apps.api.services.lyrics import init_providers
 
 
 @asynccontextmanager
@@ -14,6 +15,7 @@ async def lifespan(app: FastAPI):
         app.state.http_client = client
         if settings.database_url:
             init_db(settings.database_url)
+        init_providers(client)
         yield
 
 
