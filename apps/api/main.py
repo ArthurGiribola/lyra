@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 
 from apps.api.config import settings
@@ -9,9 +10,11 @@ from apps.api.routers import health
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.database_url:
-        init_db(settings.database_url)
-    yield
+    async with httpx.AsyncClient() as client:
+        app.state.http_client = client
+        if settings.database_url:
+            init_db(settings.database_url)
+        yield
 
 
 app = FastAPI(title="Lyra API", version="1.0.0", lifespan=lifespan)
