@@ -17,7 +17,7 @@ Lyra é uma plataforma que recebe um link do Spotify, resolve os metadados da m�
 | Migrations | Alembic |
 | Validação | Pydantic v2 |
 | HTTP client | httpx (async) |
-| Provider de letra | Genius (`lyricsgenius`) |
+| Provider de letra | LRCLib (API pública, sem chave) |
 | Auth Spotify | OAuth 2.0 Client Credentials (server-side) |
 | Testes | pytest + httpx AsyncClient |
 | Container | Docker + docker-compose |
@@ -55,7 +55,9 @@ lyra/
         spotify.py              # resolve track via link
         lyrics.py               # orquestra busca de letra
       providers/
-        genius.py               # Genius API
+        base.py                 # interface LyricsProvider
+        lrclib.py               # LRCLib API (sem chave)
+        dummy.py                # stub para testes
       db/
         models.py               # SQLAlchemy models
         session.py              # engine + AsyncSession
@@ -82,7 +84,7 @@ lyra/
   CLAUDE.md
 ```
 
-> `apps/web` e `apps/api` ainda não foram criados. A estrutura acima é o plano para o Sprint 0.
+> `apps/api` está implementado. `apps/web` (frontend) ainda não foi criado.
 
 ---
 
@@ -95,9 +97,6 @@ DATABASE_URL=postgresql+asyncpg://...
 # Spotify
 SPOTIFY_CLIENT_ID=
 SPOTIFY_CLIENT_SECRET=
-
-# Lyrics provider
-GENIUS_API_KEY=
 
 # App
 ENVIRONMENT=development
@@ -182,7 +181,7 @@ Recebe link do Spotify, resolve a música e retorna a letra.
   },
   "lyrics": {
     "text": "Verso 1\n...\nCoro\n...",
-    "provider": "genius",
+    "provider": "lrclib",
     "language": "pt"
   }
 }
@@ -212,7 +211,7 @@ lyrics (
   id           SERIAL PRIMARY KEY,
   track_id     TEXT REFERENCES tracks(id),
   text         TEXT NOT NULL,
-  provider     TEXT NOT NULL,   -- 'genius'
+  provider     TEXT NOT NULL,   -- 'lrclib'
   language     TEXT,
   fetched_at   TIMESTAMPTZ DEFAULT now()
 )
@@ -233,7 +232,7 @@ POST /lyrics
       └── MISS
           └── Spotify API → metadados da track
               (token em memória, renovado via lifespan se expirado)
-          └── Genius API → letra pelo título + artista
+          └── LRCLib API → letra pelo título + artista
           └── INSERT tracks + INSERT lyrics
           └── retorna
 ```
@@ -246,7 +245,7 @@ O token Spotify é mantido em memória no processo FastAPI (variável de módulo
 
 - Pydantic v2 em todos os schemas de entrada e saída. Nunca `dict` cru.
 - SQLAlchemy async em todas as queries. Nunca operações síncronas em rotas.
-- Erros externos (Spotify, Genius) nunca chegam crus ao cliente: envolva em exceções de domínio com HTTPException apropriado.
+- Erros externos (Spotify, LRCLib) nunca chegam crus ao cliente: envolva em exceções de domínio com HTTPException apropriado.
 - Testes de integração usam banco PostgreSQL real via docker-compose. Sem mocks de infraestrutura de dados.
 - Type hints obrigatórios em todas as funções. Sem `Any` sem comentário justificando.
 - Commits em inglês, mensagem no imperativo.
@@ -256,7 +255,7 @@ O token Spotify é mantido em memória no processo FastAPI (variável de módulo
 
 ## O que não está na V1
 
-- `apps/web` e `apps/api` (ainda não criados — Sprint 0 os inicializa)
+- `apps/web` — frontend Next.js (não criado ainda)
 - YouTube Music, Apple Music, Deezer (futuro)
 - pgvector / busca semântica (futuro — módulo Universe)
 - Endpoints admin, takedown, métricas agregadas (futuro)

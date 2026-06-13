@@ -22,7 +22,7 @@ Este documento registra as decisões arquiteturais, o escopo fechado da V1, o qu
 |---|---|
 | Input | Link do Spotify apenas (`open.spotify.com/track/...`) |
 | Resolução de metadados | Spotify API (Client Credentials) |
-| Busca de letra | Genius API via `lyricsgenius` |
+| Busca de letra | LRCLib API (pública, sem chave) |
 | Persistência | Supabase/PostgreSQL para tracks e lyrics |
 | Token Spotify | Cache em memória no processo FastAPI |
 | Endpoint principal | `POST /lyrics` |
@@ -64,9 +64,9 @@ Redis resolve dois problemas: cache de token e cache de letras. Na V1, o token S
 
 Na V1 o Lyra não age em nome de usuário. A API só precisa de metadados públicos da track (título, artista, álbum). Client Credentials é mais simples, não expira por inatividade do usuário e não requer fluxo de redirect. Authorization Code só fará sentido quando/se houver features personalizadas por conta (playlists, histórico do usuário).
 
-### 2.6 Por que Genius como provider de letra?
+### 2.6 Por que LRCLib como provider de letra?
 
-Genius tem uma biblioteca Python oficial (`lyricsgenius`) bem mantida, cobertura ampla de catálogo e busca por título + artista que funciona mesmo sem ISRC. Para a V1, `lyricsgenius` elimina a necessidade de implementar a integração HTTP do zero. Se a cobertura do Genius se provar insuficiente para certos gêneros ou regiões, um segundo provider pode ser adicionado como fallback em V1.1.
+LRCLib é uma API pública de letras sincronizadas, sem necessidade de chave de API ou cadastro. A integração é um único `GET /api/get?track_name=...&artist_name=...` que retorna JSON com o campo `plainLyrics`. Vantagens para a V1: zero configuração operacional, sem rate limit documentado, resposta limpa e previsível. Adicionalmente, o formato LRC (letras sincronizadas por timestamp) está disponível no mesmo endpoint e pode ser aproveitado em versões futuras para exibição karaokê. Se a cobertura do LRCLib se provar insuficiente para certos gêneros ou regiões, Genius ou Musixmatch podem ser adicionados como fallback na V1.1.
 
 ### 2.7 Por que não pgvector na V1?
 
@@ -119,8 +119,8 @@ Cliente → POST /lyrics { url: "https://open.spotify.com/track/4uLU6hMCjMI75M1A
 4. Spotify API: GET /tracks/{id}
    (token em memória; se expirado, renova via Client Credentials antes de prosseguir)
    → Extrai: title, artist, album, duration_ms
-5. Genius API: busca por "{title} {artist}" via lyricsgenius
-   → sucesso: letra encontrada
+5. LRCLib API: GET /api/get?track_name={title}&artist_name={artist}
+   → sucesso: letra encontrada em plainLyrics
    → falha: retorna 404 com error="lyrics_not_found"
 6. INSERT tracks + INSERT lyrics no Postgres
 7. Retorna resposta formatada
@@ -149,7 +149,7 @@ Cliente → POST /lyrics { url: "https://open.spotify.com/track/4uLU6hMCjMI75M1A
 - [ ] `GET /health` retornando status do banco
 - [ ] Serviço Spotify: Client Credentials com cache de token em memória (lifespan)
 - [ ] Serviço Spotify: `resolve_track(url: str) → TrackMetadata`
-- [ ] Provider Genius: `get_lyrics(title: str, artist: str) → str`
+- [x] Provider LRCLib: `get_lyrics(title: str, artist: str) → str`
 - [ ] `POST /lyrics` orquestrando o fluxo completo
 - [ ] Testes de integração: health, lyrics com track real, lyrics sem letra disponível
 - [ ] `.env.example` documentado
@@ -169,7 +169,7 @@ curl -X POST http://localhost:8000/lyrics \
   -d '{"url":"https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"}'
 ```
 
-Retorna 200 com letra formatada. Segunda chamada com a mesma URL retorna do Postgres (sem chamada ao Genius). Interface web exibe a letra com título e artista.
+Retorna 200 com letra formatada. Segunda chamada com a mesma URL retorna do Postgres (sem chamada ao LRCLib). Interface web exibe a letra com título e artista.
 
 ---
 
@@ -218,7 +218,7 @@ As decisões abaixo foram postergadas com critério.
 
 | Risco | Probabilidade | Mitigação |
 |---|---|---|
-| Genius não encontra letra por título/artista ambíguo | Média | Normalizar título antes da busca; adicionar Musixmatch como fallback na V1.1 |
+| LRCLib não encontra letra por título/artista ambíguo ou catálogo regional limitado | Média | Normalizar título antes da busca; adicionar Genius ou Musixmatch como fallback na V1.1 |
 | Spotify depreca endpoint de track | Baixa | Endpoint `/tracks/{id}` é estável desde 2014 |
 | Letra protegida por copyright não disponível via API | Alta para catálogo regional | 404 explícito, sem tentar scraping |
 | Token Spotify perdido no restart do processo | Baixa | Renovação automática na próxima requisição; sem impacto no dado, apenas latência extra uma vez |
