@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from fastapi import HTTPException
 
@@ -64,6 +65,26 @@ async def test_lrclib_provider_returns_none_on_provider_error() -> None:
     provider = LRCLibProvider(_mock_client(500))
     result = await provider.get_lyrics(title="Blinding Lights", artist="The Weeknd")
     assert result is None
+
+
+async def test_lrclib_provider_raises_502_on_timeout() -> None:
+    client = AsyncMock()
+    client.get.side_effect = httpx.ReadTimeout("timed out")
+    provider = LRCLibProvider(client)
+    with pytest.raises(HTTPException) as exc_info:
+        await provider.get_lyrics(title="Blinding Lights", artist="The Weeknd")
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == "LRCLib request timed out"
+
+
+async def test_lrclib_provider_raises_502_on_network_error() -> None:
+    client = AsyncMock()
+    client.get.side_effect = httpx.ConnectError("connection refused")
+    provider = LRCLibProvider(client)
+    with pytest.raises(HTTPException) as exc_info:
+        await provider.get_lyrics(title="Blinding Lights", artist="The Weeknd")
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == "LRCLib request failed"
 
 
 # --- get_lyrics orchestration ---

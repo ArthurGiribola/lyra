@@ -82,3 +82,13 @@ async def test_post_lyrics_provider_error_returns_502(client: AsyncClient) -> No
         response = await client.post("/lyrics", json={"url": _VALID_URL})
 
     assert response.status_code == 502
+
+
+async def test_post_lyrics_lrclib_timeout_returns_502(client: AsyncClient) -> None:
+    exc = HTTPException(status_code=502, detail="LRCLib request timed out")
+    with patch("apps.api.routers.lyrics.resolve_track", AsyncMock(return_value=_SAMPLE_TRACK)), \
+         patch("apps.api.routers.lyrics.get_lyrics", AsyncMock(side_effect=exc)):
+        response = await client.post("/lyrics", json={"url": _VALID_URL})
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "LRCLib request timed out"
