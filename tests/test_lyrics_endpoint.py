@@ -16,6 +16,7 @@ _SAMPLE_TRACK = TrackMetadata(
     album="After Hours",
     duration_ms=200040,
     spotify_url=_VALID_URL,
+    cover_url="https://i.scdn.co/image/test_cover_640",
 )
 
 _SAMPLE_LYRICS = LyricsResult(
@@ -33,9 +34,13 @@ async def test_post_lyrics_returns_200(client: AsyncClient) -> None:
     data = response.json()
     assert data["title"] == "Blinding Lights"
     assert data["artist"] == "The Weeknd"
+    assert data["album"] == "After Hours"
+    assert data["cover_url"] == "https://i.scdn.co/image/test_cover_640"
+    assert data["duration_ms"] == 200040
+    assert data["spotify_url"] == _VALID_URL
     assert data["provider"] == "lrclib"
     assert data["lyrics"] == _SAMPLE_LYRICS.text
-    assert set(data.keys()) == {"title", "artist", "provider", "lyrics"}
+    assert set(data.keys()) == {"title", "artist", "album", "cover_url", "duration_ms", "spotify_url", "provider", "lyrics"}
 
 
 async def test_post_lyrics_missing_url_returns_422(client: AsyncClient) -> None:

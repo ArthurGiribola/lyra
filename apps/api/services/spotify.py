@@ -71,6 +71,7 @@ async def resolve_track(url: str, client: httpx.AsyncClient) -> TrackMetadata:
         raise HTTPException(status_code=502, detail="Spotify API error")
 
     data = response.json()
+    images = data.get("album", {}).get("images", [])
     return TrackMetadata(
         id=f"spotify:track:{data['id']}",
         title=data["name"],
@@ -78,4 +79,5 @@ async def resolve_track(url: str, client: httpx.AsyncClient) -> TrackMetadata:
         album=data["album"]["name"],
         duration_ms=data["duration_ms"],
         spotify_url=data["external_urls"]["spotify"],
+        cover_url=images[0]["url"] if images else None,
     )

@@ -34,7 +34,12 @@ def _mock_track_response() -> MagicMock:
         "id": _TRACK_ID,
         "name": "Blinding Lights",
         "artists": [{"name": "The Weeknd"}],
-        "album": {"name": "After Hours"},
+        "album": {
+            "name": "After Hours",
+            "images": [
+                {"url": "https://i.scdn.co/image/test_cover_640", "height": 640, "width": 640},
+            ],
+        },
         "duration_ms": 200040,
         "external_urls": {"spotify": _VALID_URL},
     }
@@ -137,6 +142,7 @@ async def test_resolve_track_success() -> None:
     assert result.album == "After Hours"
     assert result.duration_ms == 200040
     assert result.spotify_url == _VALID_URL
+    assert result.cover_url == "https://i.scdn.co/image/test_cover_640"
 
 
 async def test_resolve_track_not_found() -> None:

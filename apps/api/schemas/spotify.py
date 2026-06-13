@@ -8,3 +8,4 @@ class TrackMetadata(BaseModel):
     album: str | None
     duration_ms: int
     spotify_url: str
+    cover_url: str | None = None
