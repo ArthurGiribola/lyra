@@ -1,10 +1,24 @@
+import re
+
 import httpx
 from fastapi import HTTPException
 
 from apps.api.providers.base import LyricsProvider
-from apps.api.schemas.lyrics import LyricsResult
+from apps.api.schemas.lyrics import LyricsResult, SyncedLine
 
 _BASE_URL = "https://lrclib.net/api/get"
+_LRC_RE = re.compile(r"^\[(\d{2}):(\d{2})\.(\d{2})\]\s?(.*)")
+
+
+def _parse_lrc(raw: str) -> list[SyncedLine] | None:
+    lines = []
+    for line in raw.splitlines():
+        m = _LRC_RE.match(line)
+        if m:
+            mm, ss, cc, text = m.groups()
+            time_ms = (int(mm) * 60 + int(ss)) * 1000 + int(cc) * 10
+            lines.append(SyncedLine(time_ms=time_ms, text=text))
+    return lines if lines else None
 
 
 class LRCLibProvider(LyricsProvider):
@@ -30,4 +44,6 @@ class LRCLibProvider(LyricsProvider):
         text = data.get("plainLyrics")
         if not text:
             return None
-        return LyricsResult(text=text, provider="lrclib")
+        raw_synced = data.get("syncedLyrics")
+        synced_lines = _parse_lrc(raw_synced) if raw_synced else None
+        return LyricsResult(text=text, provider="lrclib", synced_lines=synced_lines)

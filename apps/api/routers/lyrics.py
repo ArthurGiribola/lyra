@@ -21,4 +21,5 @@ async def get_lyrics_endpoint(body: LyricsRequest, request: Request) -> LyricsRe
         spotify_url=track.spotify_url,
         provider=result.provider,
         lyrics=result.text,
+        synced_lines=result.synced_lines,
     )

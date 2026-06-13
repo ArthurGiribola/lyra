@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from apps.api.schemas.lyrics import SyncedLine
+
 
 class LyricsRequest(BaseModel):
     url: str
@@ -14,3 +16,4 @@ class LyricsResponse(BaseModel):
     spotify_url: str | None = None
     provider: str
     lyrics: str
+    synced_lines: list[SyncedLine] | None = None

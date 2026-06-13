@@ -7,8 +7,8 @@ from fastapi import HTTPException
 import apps.api.services.lyrics as lyrics_module
 from apps.api.providers.base import LyricsProvider
 from apps.api.providers.dummy import DummyLyricsProvider
-from apps.api.providers.lrclib import LRCLibProvider
-from apps.api.schemas.lyrics import LyricsResult
+from apps.api.providers.lrclib import LRCLibProvider, _parse_lrc
+from apps.api.schemas.lyrics import LyricsResult, SyncedLine
 from apps.api.services.lyrics import get_lyrics
 
 
@@ -17,13 +17,21 @@ class _NullProvider(LyricsProvider):
         return None
 
 
-def _mock_client(status: int, plain_lyrics: str | None = None) -> AsyncMock:
+def _mock_client(
+    status: int,
+    plain_lyrics: str | None = None,
+    synced_lyrics: str | None = None,
+) -> AsyncMock:
     resp = MagicMock()
     resp.status_code = status
-    resp.json.return_value = {"plainLyrics": plain_lyrics}
+    resp.json.return_value = {"plainLyrics": plain_lyrics, "syncedLyrics": synced_lyrics}
     client = AsyncMock()
     client.get.return_value = resp
     return client
+
+
+_SAMPLE_LRC = "[00:09.65] First line\n[00:12.10] Second line\n[00:14.00] "
+_SAMPLE_PLAIN = "First line\nSecond line\n"
 
 
 # --- DummyLyricsProvider ---
@@ -53,6 +61,25 @@ async def test_lrclib_provider_returns_lyrics_on_success() -> None:
     assert isinstance(result, LyricsResult)
     assert result.provider == "lrclib"
     assert result.text == "Verse 1\nChorus"
+    assert result.synced_lines is None
+
+
+async def test_lrclib_provider_returns_synced_lines_when_available() -> None:
+    provider = LRCLibProvider(_mock_client(200, _SAMPLE_PLAIN, _SAMPLE_LRC))
+    result = await provider.get_lyrics(title="Shape of You", artist="Ed Sheeran")
+    assert result is not None
+    assert result.synced_lines is not None
+    assert len(result.synced_lines) == 3
+    assert result.synced_lines[0] == SyncedLine(time_ms=9650, text="First line")
+    assert result.synced_lines[1] == SyncedLine(time_ms=12100, text="Second line")
+    assert result.synced_lines[2] == SyncedLine(time_ms=14000, text="")
+
+
+async def test_lrclib_provider_synced_lines_none_when_field_absent() -> None:
+    provider = LRCLibProvider(_mock_client(200, "Verse 1\nChorus", synced_lyrics=None))
+    result = await provider.get_lyrics(title="Blinding Lights", artist="The Weeknd")
+    assert result is not None
+    assert result.synced_lines is None
 
 
 async def test_lrclib_provider_returns_none_when_not_found() -> None:
@@ -140,3 +167,33 @@ async def test_get_lyrics_raises_404_when_all_providers_return_none() -> None:
 def test_lyrics_provider_is_abstract() -> None:
     with pytest.raises(TypeError):
         LyricsProvider()  # type: ignore[abstract]
+
+
+# --- _parse_lrc ---
+
+
+def test_parse_lrc_converts_timestamps_to_ms() -> None:
+    raw = "[00:09.65] First line\n[01:02.30] Second line"
+    lines = _parse_lrc(raw)
+    assert lines is not None
+    assert lines[0] == SyncedLine(time_ms=9650, text="First line")
+    assert lines[1] == SyncedLine(time_ms=62300, text="Second line")
+
+
+def test_parse_lrc_handles_empty_text_lines() -> None:
+    raw = "[00:09.00] Text\n[00:10.00] "
+    lines = _parse_lrc(raw)
+    assert lines is not None
+    assert lines[1] == SyncedLine(time_ms=10000, text="")
+
+
+def test_parse_lrc_returns_none_for_empty_string() -> None:
+    assert _parse_lrc("") is None
+
+
+def test_parse_lrc_skips_non_timestamp_lines() -> None:
+    raw = "not a timestamp line\n[00:01.00] Valid line"
+    lines = _parse_lrc(raw)
+    assert lines is not None
+    assert len(lines) == 1
+    assert lines[0].text == "Valid line"

@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
 
-from apps.api.schemas.lyrics import LyricsResult
+from apps.api.schemas.lyrics import LyricsResult, SyncedLine
 from apps.api.schemas.spotify import TrackMetadata
 
 _VALID_URL = "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"
@@ -22,6 +22,10 @@ _SAMPLE_TRACK = TrackMetadata(
 _SAMPLE_LYRICS = LyricsResult(
     text="I've been on my own for long enough\nMaybe you can show me how to love",
     provider="lrclib",
+    synced_lines=[
+        SyncedLine(time_ms=1000, text="I've been on my own for long enough"),
+        SyncedLine(time_ms=4500, text="Maybe you can show me how to love"),
+    ],
 )
 
 
@@ -40,7 +44,11 @@ async def test_post_lyrics_returns_200(client: AsyncClient) -> None:
     assert data["spotify_url"] == _VALID_URL
     assert data["provider"] == "lrclib"
     assert data["lyrics"] == _SAMPLE_LYRICS.text
-    assert set(data.keys()) == {"title", "artist", "album", "cover_url", "duration_ms", "spotify_url", "provider", "lyrics"}
+    assert data["synced_lines"] == [
+        {"time_ms": 1000, "text": "I've been on my own for long enough"},
+        {"time_ms": 4500, "text": "Maybe you can show me how to love"},
+    ]
+    assert set(data.keys()) == {"title", "artist", "album", "cover_url", "duration_ms", "spotify_url", "provider", "lyrics", "synced_lines"}
 
 
 async def test_post_lyrics_missing_url_returns_422(client: AsyncClient) -> None:
