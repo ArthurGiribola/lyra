@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { fetchLyrics, ApiError, type LyricsResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,28 +32,24 @@ function LyraIcon() {
   );
 }
 
-function LoadingDots() {
+function AlertIcon() {
   return (
-    <div
-      className="flex items-center justify-center gap-1.5 py-10"
-      aria-label="Buscando letra…"
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
     >
-      {[0, 200, 400].map((delay) => (
-        <span
-          key={delay}
-          className="size-1.5 rounded-full bg-muted-foreground animate-[dotPulse_1.4s_ease-in-out_infinite]"
-          style={{ animationDelay: `${delay}ms` }}
-        />
-      ))}
-    </div>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
   );
-}
-
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function SpotifyIcon() {
@@ -70,75 +66,117 @@ function SpotifyIcon() {
   );
 }
 
+function LoadingDots() {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-4 py-12"
+      aria-label="Buscando letra…"
+    >
+      <div className="flex items-center gap-1.5">
+        {[0, 200, 400].map((delay) => (
+          <span
+            key={delay}
+            className="size-1.5 rounded-full bg-muted-foreground animate-[dotPulse_1.4s_ease-in-out_infinite]"
+            style={{ animationDelay: `${delay}ms` }}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground/40 animate-pulse">
+        Isso pode levar alguns segundos…
+      </p>
+    </div>
+  );
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 function LyricsResult({ result }: { result: LyricsResponse }) {
+  const stanzas = result.lyrics.split(/\n\n+/).map((s) => s.trim()).filter(Boolean);
+
   return (
     <div className="w-full animate-[fadeSlideUp_0.35s_ease-out_forwards]">
-      {/* Track header */}
-      <div className="flex items-start gap-4 mb-5 pb-4 border-b border-white/[0.07]">
-        {/* Album cover */}
-        <div className="shrink-0 size-20 rounded-md overflow-hidden bg-white/[0.06]">
-          {result.cover_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={result.cover_url}
-              alt={result.album ?? result.title}
-              width={80}
-              height={80}
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="size-full flex items-center justify-center text-muted-foreground/20">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
-              </svg>
-            </div>
-          )}
-        </div>
+      {/* Track card */}
+      <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 mb-8">
+        <div className="flex items-start gap-4">
+          {/* Album cover */}
+          <div className="shrink-0 size-20 sm:size-24 rounded-xl overflow-hidden bg-white/[0.06]">
+            {result.cover_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={result.cover_url}
+                alt={result.album ?? result.title}
+                width={96}
+                height={96}
+                className="size-full object-cover"
+              />
+            ) : (
+              <div className="size-full flex items-center justify-center text-muted-foreground/20">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
+                </svg>
+              </div>
+            )}
+          </div>
 
-        {/* Metadata */}
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold tracking-tight leading-snug truncate">
-            {result.title}
-          </h2>
-          <p className="text-sm text-muted-foreground mt-0.5 truncate">
-            {result.artist}
+          {/* Metadata */}
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h2 className="text-lg font-semibold tracking-tight leading-snug line-clamp-2">
+              {result.title}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1 truncate">
+              {result.artist}
+            </p>
             {result.duration_ms != null && (
-              <span className="text-muted-foreground/50 before:content-['·'] before:mx-1.5">
+              <p className="text-xs text-muted-foreground/40 mt-0.5">
                 {formatDuration(result.duration_ms)}
-              </span>
+              </p>
             )}
-          </p>
-          {result.album && (
-            <p className="text-xs text-muted-foreground/50 mt-1 truncate">{result.album}</p>
-          )}
+            {result.album && (
+              <p className="text-sm text-muted-foreground/50 mt-1 truncate">
+                {result.album}
+              </p>
+            )}
 
-          {/* Actions row */}
-          <div className="flex items-center gap-2 mt-3">
-            <Badge
-              variant="outline"
-              className="text-[11px] border-white/10 text-muted-foreground font-normal"
-            >
-              {result.provider}
-            </Badge>
-            {result.spotify_url && (
-              <a
-                href={result.spotify_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-[11px] text-[#1DB954] border border-[#1DB954]/30 rounded-full px-2.5 py-0.5 hover:bg-[#1DB954]/10 transition-colors"
+            {/* Actions */}
+            <div className="flex items-center gap-2 mt-3">
+              <Badge
+                variant="outline"
+                className="text-[11px] border-white/10 text-muted-foreground font-normal"
               >
-                <SpotifyIcon />
-                Abrir no Spotify
-              </a>
-            )}
+                {result.provider}
+              </Badge>
+              {result.spotify_url && (
+                <a
+                  href={result.spotify_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[11px] text-[#1DB954] border border-[#1DB954]/30 rounded-full px-2.5 py-0.5 hover:bg-[#1DB954]/10 transition-colors"
+                >
+                  <SpotifyIcon />
+                  Abrir no Spotify
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Lyrics */}
-      <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-foreground/80 max-h-[62vh] overflow-y-auto lyra-scrollbar pr-2">
-        {result.lyrics}
-      </pre>
+      <div className="space-y-6 pb-16">
+        {stanzas.map((stanza, i) => (
+          <p
+            key={i}
+            className="text-[15px] leading-8 text-foreground/85 whitespace-pre-line"
+          >
+            {stanza}
+          </p>
+        ))}
+      </div>
     </div>
   );
 }
@@ -148,6 +186,7 @@ export default function LyricsSearch() {
   const [state, setState] = useState<State>("idle");
   const [result, setResult] = useState<LyricsResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -172,6 +211,12 @@ export default function LyricsSearch() {
     }
   }
 
+  function handleRetry() {
+    setState("idle");
+    setErrorMessage("");
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center px-4 pt-14 pb-12">
       {/* Wordmark */}
@@ -187,6 +232,7 @@ export default function LyricsSearch() {
         <form onSubmit={handleSubmit}>
           <div className="flex items-center rounded-full border border-white/[0.08] bg-white/[0.04] focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10 transition-all duration-200">
             <Input
+              ref={inputRef}
               type="url"
               placeholder="https://open.spotify.com/track/…"
               value={url}
@@ -205,9 +251,18 @@ export default function LyricsSearch() {
         </form>
 
         {state === "error" && (
-          <p className="mt-3 text-sm text-destructive text-center px-2 animate-[fadeSlideUp_0.2s_ease-out_forwards]">
-            {errorMessage}
-          </p>
+          <div className="mt-4 flex flex-col items-center gap-2 animate-[fadeSlideUp_0.2s_ease-out_forwards]">
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertIcon />
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              onClick={handleRetry}
+              className="text-xs text-muted-foreground/50 hover:text-muted-foreground underline underline-offset-2 transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
         )}
       </div>
 
