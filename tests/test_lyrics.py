@@ -67,6 +67,23 @@ async def test_lrclib_provider_returns_none_on_provider_error() -> None:
     assert result is None
 
 
+async def test_lrclib_provider_applies_extended_read_timeout() -> None:
+    client = AsyncMock()
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {"plainLyrics": "Verse\nChorus"}
+    client.get.return_value = resp
+
+    provider = LRCLibProvider(client)
+    await provider.get_lyrics(title="Shape of You", artist="Ed Sheeran")
+
+    _, kwargs = client.get.call_args
+    timeout = kwargs.get("timeout")
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.read == 20.0
+    assert timeout.connect == 10.0
+
+
 async def test_lrclib_provider_raises_502_on_timeout() -> None:
     client = AsyncMock()
     client.get.side_effect = httpx.ReadTimeout("timed out")

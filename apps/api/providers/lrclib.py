@@ -16,6 +16,7 @@ class LRCLibProvider(LyricsProvider):
             response = await self._client.get(
                 _BASE_URL,
                 params={"track_name": title, "artist_name": artist},
+                timeout=httpx.Timeout(10.0, read=20.0),
             )
         except httpx.TimeoutException as exc:
             raise HTTPException(status_code=502, detail="LRCLib request timed out") from exc
