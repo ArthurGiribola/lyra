@@ -1,6 +1,10 @@
 export interface LyricsResponse {
   title: string;
   artist: string;
+  album: string | null;
+  cover_url: string | null;
+  duration_ms: number | null;
+  spotify_url: string | null;
   provider: string;
   lyrics: string;
 }
