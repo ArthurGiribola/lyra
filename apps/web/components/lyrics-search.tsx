@@ -5,8 +5,10 @@ import { fetchLyrics, ApiError, type LyricsResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import SyncedLyrics from "@/components/synced-lyrics";
 
 type State = "idle" | "loading" | "success" | "error";
+type LyricsMode = "normal" | "synced";
 
 function LyraIcon() {
   return (
@@ -66,6 +68,27 @@ function SpotifyIcon() {
   );
 }
 
+function WaveformIcon() {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <line x1="2" y1="7" x2="2" y2="9" />
+      <line x1="5" y1="4" x2="5" y2="12" />
+      <line x1="8" y1="2" x2="8" y2="14" />
+      <line x1="11" y1="4" x2="11" y2="12" />
+      <line x1="14" y1="7" x2="14" y2="9" />
+    </svg>
+  );
+}
+
 function LoadingDots() {
   return (
     <div
@@ -95,8 +118,21 @@ function formatDuration(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-function LyricsResult({ result }: { result: LyricsResponse }) {
-  const stanzas = result.lyrics.split(/\n\n+/).map((s) => s.trim()).filter(Boolean);
+function LyricsResult({
+  result,
+  lyricsMode,
+  onToggleMode,
+}: {
+  result: LyricsResponse;
+  lyricsMode: LyricsMode;
+  onToggleMode: () => void;
+}) {
+  const stanzas = result.lyrics
+    .split(/\n\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const hasSynced =
+    result.synced_lines !== null && result.synced_lines.length > 0;
 
   return (
     <div className="w-full animate-[fadeSlideUp_0.35s_ease-out_forwards]">
@@ -116,7 +152,13 @@ function LyricsResult({ result }: { result: LyricsResponse }) {
               />
             ) : (
               <div className="size-full flex items-center justify-center text-muted-foreground/20">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
                   <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
                 </svg>
               </div>
@@ -143,7 +185,7 @@ function LyricsResult({ result }: { result: LyricsResponse }) {
             )}
 
             {/* Actions */}
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex flex-wrap items-center gap-2 mt-3">
               <Badge
                 variant="outline"
                 className="text-[11px] border-white/10 text-muted-foreground font-normal"
@@ -161,22 +203,43 @@ function LyricsResult({ result }: { result: LyricsResponse }) {
                   Abrir no Spotify
                 </a>
               )}
+              {hasSynced && (
+                <button
+                  onClick={onToggleMode}
+                  className={[
+                    "inline-flex items-center gap-1.5 text-[11px] rounded-full px-2.5 py-0.5 border transition-colors",
+                    lyricsMode === "synced"
+                      ? "text-primary border-primary/40 bg-primary/10 hover:bg-primary/20"
+                      : "text-muted-foreground border-white/10 hover:bg-white/[0.06]",
+                  ].join(" ")}
+                >
+                  <WaveformIcon />
+                  {lyricsMode === "synced" ? "Modo Normal" : "Modo Sincronizado"}
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       {/* Lyrics */}
-      <div className="space-y-6 pb-16">
-        {stanzas.map((stanza, i) => (
-          <p
-            key={i}
-            className="text-[15px] leading-8 text-foreground/85 whitespace-pre-line"
-          >
-            {stanza}
-          </p>
-        ))}
-      </div>
+      {lyricsMode === "synced" && result.synced_lines && result.synced_lines.length > 0 ? (
+        <SyncedLyrics
+          lines={result.synced_lines}
+          durationMs={result.duration_ms}
+        />
+      ) : (
+        <div className="space-y-6 pb-16">
+          {stanzas.map((stanza, i) => (
+            <p
+              key={i}
+              className="text-[15px] leading-8 text-foreground/85 whitespace-pre-line"
+            >
+              {stanza}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -186,6 +249,7 @@ export default function LyricsSearch() {
   const [state, setState] = useState<State>("idle");
   const [result, setResult] = useState<LyricsResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [lyricsMode, setLyricsMode] = useState<LyricsMode>("normal");
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -196,6 +260,7 @@ export default function LyricsSearch() {
     setState("loading");
     setResult(null);
     setErrorMessage("");
+    setLyricsMode("normal");
 
     try {
       const data = await fetchLyrics(trimmed);
@@ -272,7 +337,13 @@ export default function LyricsSearch() {
       {/* Result */}
       {state === "success" && result && (
         <div className="w-full max-w-xl mt-7">
-          <LyricsResult result={result} />
+          <LyricsResult
+            result={result}
+            lyricsMode={lyricsMode}
+            onToggleMode={() =>
+              setLyricsMode((m) => (m === "normal" ? "synced" : "normal"))
+            }
+          />
         </div>
       )}
 

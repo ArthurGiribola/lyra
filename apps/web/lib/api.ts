@@ -1,3 +1,8 @@
+export interface SyncedLine {
+  time_ms: number;
+  text: string;
+}
+
 export interface LyricsResponse {
   title: string;
   artist: string;
@@ -7,6 +12,7 @@ export interface LyricsResponse {
   spotify_url: string | null;
   provider: string;
   lyrics: string;
+  synced_lines: SyncedLine[] | null;
 }
 
 export class ApiError extends Error {
